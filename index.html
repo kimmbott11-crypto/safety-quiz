@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>산업안전 랜덤 문제</title>
+
+<style>
+body{
+font-family:sans-serif;
+text-align:center;
+padding:40px;
+}
+
+#question{
+font-size:22px;
+margin:40px;
+}
+
+#answer{
+font-size:20px;
+color:blue;
+display:none;
+}
+
+button{
+padding:12px 20px;
+margin:10px;
+font-size:16px;
+}
+</style>
+
+</head>
+
+<body>
+
+<h2>산업안전 랜덤 문제</h2>
+
+<div id="question"></div>
+<div id="answer"></div>
+
+<button onclick="showAnswer()">답 보기</button>
+<button onclick="wrong()">틀림</button>
+<button onclick="nextQuestion()">다음 문제</button>
+
+<script src="app.js"></script>
+
+</body>
+</html>
