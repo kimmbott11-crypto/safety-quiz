@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VT 2차측 퓨즈 단선 시뮬레이터</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+  :root {
+    --bg: #0f1923; --surface: #182030; --border: #263044;
+    --text: #e2e8f0; --muted: #64748b;
+    --A: #f87171; --B: #60a5fa; --C: #4ade80;
+    --line-ab: #fb923c; --line-bc: #a78bfa; --line-ca: #34d399;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+  }
+  .h-icon { font-size: 22px; }
+  .h-title { font-size: 15px; font-weight: 700; }
+  .h-sub { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .h-badge {
+    margin-left: auto; background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.35);
+    color: var(--warn); font-size: 10px; padding: 3px 10px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600;
+  }
+  .nav-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border); color: var(--muted); text-decoration: none;
+    font-family: 'JetBrains Mono', monospace; transition: all 0.2s;
+  }
+  .nav-link:hover { border-color: var(--warn); color: var(--warn); }
+  .main { max-width: 1100px; margin: 0 auto; padding: 20px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:760px){ .main { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .card-header { padding: 11px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .card-header h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); }
+  .card-body { padding: 16px; }
+  /* Buttons */
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .fault-btn {
+    flex: 1; min-width: 100px; padding: 10px 8px;
+    border: 1px solid var(--border); border-radius: 7px;
+    background: transparent; color: var(--muted); cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    transition: all 0.2s; text-align: center; line-height: 1.4;
+  }
+  .fault-btn:hover { border-color: var(--warn); color: var(--warn); }
+  .fault-btn.active-normal { border-color: #4ade80; color: #4ade80; background: rgba(74,222,128,0.08); }
+  .fault-btn.active-a { border-color: var(--A); color: var(--A); background: rgba(248,113,113,0.08); }
+  .fault-btn.active-b { border-color: var(--B); color: var(--B); background: rgba(96,165,250,0.08); }
+  .fault-btn.active-c { border-color: var(--C); color: var(--C); background: rgba(74,222,128,0.08); }
+  /* Status */
+  .status-box {
+    padding: 10px 14px; border-radius: 7px; font-size: 12px; font-weight: 500;
+    margin-bottom: 14px; border: 1px solid; display: flex; align-items: center; gap: 8px;
+  }
+  .status-normal { background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+  .status-fault  { background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.3); color: var(--A); }
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 9px 10px; text-align: center; border-bottom: 1px solid var(--border); }
+  th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .td-name { text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .td-val { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; }
+  .td-ang { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .ok   { color: #4ade80; }
+  .warn { color: var(--A); }
+  .zero { color: var(--muted); }
+  /* Color dots */
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .dot-A { background: var(--A); }
+  .dot-B { background: var(--B); }
+  .dot-C { background: var(--C); }
+  .dot-AB { background: var(--line-ab); }
+  .dot-BC { background: var(--line-bc); }
+  .dot-CA { background: var(--line-ca); }
+  /* SVG phasor */
+  .phasor-wrap { position: relative; }
+  svg.phasor { width: 100%; height: 300px; display: block; }
+  .phasor-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
+  .leg-item { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  .leg-line { width: 18px; height: 2px; display: inline-block; border-radius: 2px; }
+  /* Section separator */
+  .sec-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 14px 0 8px; }
+  /* Explanation box */
+  .exp-box { background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.2); border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #93c5fd; margin-top: 12px; line-height: 1.8; }
+  .exp-box b { color: #dbeafe; }
+</style>
+</head>
+<body>
+<header>
+  <span class="h-icon">⚡</span>
+  <div>
+    <div class="h-title">VT 2차측 퓨즈 단선 시뮬레이터</div>
+    <div class="h-sub">Y-Y 결선 | 3300V / 110V | 교육용</div>
+  </div>
+  <span class="h-badge">계측·보호 교육</span>
+  <a href="index.html" class="nav-link" style="margin-left:12px">← 퀴즈로 돌아가기</a>
+</header>
+<div class="main">
+  <!-- LEFT: Control + Table -->
+  <div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><h2>⚙ 고장 시뮬레이션</h2></div>
+      <div class="card-body">
+        <div class="btn-row">
+          <button class="fault-btn active-normal" id="btn-normal" onclick="simulate('normal')">✅ 정상</button>
+          <button class="fault-btn" id="btn-a" onclick="simulate('a')"><span style="color:var(--A)">■</span> A상(u)<br>퓨즈 단선</button>
+          <button class="fault-btn" id="btn-b" onclick="simulate('b')"><span style="color:var(--B)">■</span> B상(v)<br>퓨즈 단선</button>
+          <button class="fault-btn" id="btn-c" onclick="simulate('c')"><span style="color:var(--C)">■</span> C상(w)<br>퓨즈 단선</button>
+        </div>
+        <div class="status-box status-normal" id="status-box">
+          <span>✅</span> <span id="status-text">계통 정상 운전 중 — 불평형 없음</span>
+        </div>
+        <!-- 상전압 테이블 -->
+        <div class="sec-label">상전압 (Phase Voltage)</div>
+        <table>
+          <thead><tr><th>항목</th><th>크기 (V)</th><th>각도 (°)</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="td-name"><span class="dot dot-A"></span>Va</td>
+              <td class="td-val" id="va-mag">63.5</td>
+              <td class="td-ang" id="va-ang">0°</td>
+              <td id="va-st" class="ok">정상</td>
+            </tr>
+            <tr>
+              <td class="td-name"><span class="dot dot-B"></span>Vb</td>
+              <td class="td-val" id="vb-mag">63.5</td>
+              <td class="td-ang" id="vb-ang">-120°</td>
+              <td id="vb-st" class="ok">정상</td>
+            </tr>
+            <tr>
+              <td class="td-name"><span class="dot dot-C"></span>Vc</td>
+              <td class="td-val" id="vc-mag">63.5</td>
+              <td class="td-ang" id="vc-ang">+120°</td>
+              <td id="vc-st" class="ok">정상</td>
+            </tr>
+          </tbody>
+        </table>
+        <!-- 선간전압 테이블 -->
+        <div class="sec-label" style="margin-top:14px">선간전압 (Line Voltage)</div>
+        <table>
+          <thead><tr><th>항목</th><th>크기 (V)</th><th>각도 (°)</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="td-name"><span class="dot dot-AB"></span>Vab</td>
+              <td class="td-val" id="vab-mag">110.0</td>
+              <td class="td-ang" id="vab-ang">+30°</td>
+              <td id="vab-st" class="ok">정상</td>
+            </tr>
+            <tr>
+              <td class="td-name"><span class="dot dot-BC"></span>Vbc</td>
+              <td class="td-val" id="vbc-mag">110.0</td>
+              <td class="td-ang" id="vbc-ang">-90°</td>
+              <td id="vbc-st" class="ok">정상</td>
+            </tr>
+            <tr>
+              <td class="td-name"><span class="dot dot-CA"></span>Vca</td>
+              <td class="td-val" id="vca-mag">110.0</td>
+              <td class="td-ang" id="vca-ang">+150°</td>
+              <td id="vca-st" class="ok">정상</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="exp-box" id="exp-box">
+          VT Y-Y 결선 정상 상태입니다.<br>
+          상전압 = 110/√3 ≈ <b>63.5V</b>, 선간전압 = <b>110V</b>으로 평형 유지.<br>
+          3개 선간전압이 모두 동일하며 120° 위상차를 유지합니다.
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- RIGHT: Phasor diagram -->
+  <div>
+    <div class="card">
+      <div class="card-header"><h2>📐 벡터도 (Phasor Diagram)</h2></div>
+      <div class="card-body">
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button class="fault-btn" id="pmode-phase" onclick="setPhasorMode('phase')" style="flex:1; padding:7px">상전압</button>
+          <button class="fault-btn active-normal" id="pmode-line" onclick="setPhasorMode('line')" style="flex:1; padding:7px">선간전압</button>
+          <button class="fault-btn" id="pmode-both" onclick="setPhasorMode('both')" style="flex:1; padding:7px">전체</button>
+        </div>
+        <svg class="phasor" id="phasorSvg" viewBox="0 0 340 300">
+          <defs>
+            <marker id="arr-A"  markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#f87171"/></marker>
+            <marker id="arr-B"  markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#60a5fa"/></marker>
+            <marker id="arr-C"  markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4ade80"/></marker>
+            <marker id="arr-AB" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#fb923c"/></marker>
+            <marker id="arr-BC" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#a78bfa"/></marker>
+            <marker id="arr-CA" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#34d399"/></marker>
+          </defs>
+          <g id="grid"></g>
+          <line x1="170" y1="10" x2="170" y2="290" stroke="#263044" stroke-width="1"/>
+          <line x1="10"  y1="150" x2="330" y2="150" stroke="#263044" stroke-width="1"/>
+          <g id="phasors-phase"></g>
+          <g id="phasors-line"></g>
+          <g id="labels"></g>
+        </svg>
+        <div class="phasor-legend">
+          <span class="leg-item"><span class="leg-line" style="background:var(--A)"></span>Va</span>
+          <span class="leg-item"><span class="leg-line" style="background:var(--B)"></span>Vb</span>
+          <span class="leg-item"><span class="leg-line" style="background:var(--C)"></span>Vc</span>
+          <span class="leg-item"><span class="leg-line" style="background:var(--line-ab); height:1px; border-top:2px dashed var(--line-ab);"></span>Vab</span>
+          <span class="leg-item"><span class="leg-line" style="background:var(--line-bc); height:1px; border-top:2px dashed var(--line-bc);"></span>Vbc</span>
+          <span class="leg-item"><span class="leg-line" style="background:var(--line-ca); height:1px; border-top:2px dashed var(--line-ca);"></span>Vca</span>
+        </div>
+        <div class="exp-box" id="phasor-exp" style="margin-top:10px">
+          선간전압은 상전압 벡터의 끝점 간 차이입니다.<br>
+          <b>Vab = Va − Vb</b>, <b>Vbc = Vb − Vc</b>, <b>Vca = Vc − Va</b>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const deg = d => d * Math.PI / 180;
+const polar = (mag, angleDeg) => ({ re: mag * Math.cos(deg(angleDeg)), im: mag * Math.sin(deg(angleDeg)) });
+const sub = (a, b) => ({ re: a.re - b.re, im: a.im - b.im });
+const mag = v => Math.sqrt(v.re*v.re + v.im*v.im);
+const ang = v => Math.atan2(v.im, v.re) * 180 / Math.PI;
+const fmt1 = x => x.toFixed(1);
+const fmtAng = x => { const r = Math.round(x); return (r >= 0 ? '+' : '') + r + '°'; };
+
+let currentFault = 'normal';
+let phasorMode = 'line';
+const Vph = 110 / Math.sqrt(3);
+
+function getVectors(fault) {
+  let Va = polar(Vph, 0);
+  let Vb = polar(Vph, -120);
+  let Vc = polar(Vph, 120);
+  if (fault === 'a') Va = { re: 0, im: 0 };
+  if (fault === 'b') Vb = { re: 0, im: 0 };
+  if (fault === 'c') Vc = { re: 0, im: 0 };
+  return { Va, Vb, Vc, Vab: sub(Va, Vb), Vbc: sub(Vb, Vc), Vca: sub(Vc, Va) };
+}
+
+function simulate(fault) {
+  currentFault = fault;
+  const v = getVectors(fault);
+  const btnMap = { normal: 'active-normal', a: 'active-a', b: 'active-b', c: 'active-c' };
+  document.querySelectorAll('.fault-btn[id^=btn-]').forEach(b => {
+    b.className = 'fault-btn';
+    if (b.id === 'btn-' + fault) b.classList.add(btnMap[fault]);
+  });
+  const sb = document.getElementById('status-box');
+  const st = document.getElementById('status-text');
+  const nameMap = { normal: '정상', a: 'A상(u)', b: 'B상(v)', c: 'C상(w)' };
+  if (fault === 'normal') {
+    sb.className = 'status-box status-normal';
+    st.textContent = '계통 정상 운전 중 — 불평형 없음';
+  } else {
+    sb.className = 'status-box status-fault';
+    st.textContent = `⚠ ${nameMap[fault]} 퓨즈 단선! UVR 동작 가능 — 계측 불평형`;
+  }
+  [['va', v.Va, fault === 'a'], ['vb', v.Vb, fault === 'b'], ['vc', v.Vc, fault === 'c']].forEach(([id, vec, blown]) => {
+    const m = mag(vec);
+    document.getElementById(id + '-mag').textContent = fmt1(m);
+    document.getElementById(id + '-ang').textContent = m < 0.1 ? '—' : fmtAng(ang(vec));
+    const st = document.getElementById(id + '-st');
+    if (blown) { st.textContent = '단선'; st.className = 'warn'; }
+    else { st.textContent = '정상'; st.className = 'ok'; }
+  });
+  const NOMINAL_LINE = 110;
+  [['vab', v.Vab], ['vbc', v.Vbc], ['vca', v.Vca]].forEach(([id, vec]) => {
+    const m = mag(vec);
+    document.getElementById(id + '-mag').textContent = fmt1(m);
+    document.getElementById(id + '-ang').textContent = fmtAng(ang(vec));
+    const st = document.getElementById(id + '-st');
+    if (m < 0.1) { st.textContent = '0V'; st.className = 'zero'; }
+    else if (Math.abs(m - NOMINAL_LINE) > 5) { st.textContent = '저하'; st.className = 'warn'; }
+    else { st.textContent = '정상'; st.className = 'ok'; }
+  });
+  const expMap = {
+    normal: `VT Y-Y 결선 정상 상태입니다.<br>상전압 = 110/√3 ≈ <b>63.5V</b>, 선간전압 = <b>110V</b>으로 평형 유지.<br>3개 선간전압이 모두 동일하며 120° 위상차를 유지합니다.`,
+    a: `<b>A상(u) 퓨즈 단선</b> — Va = 0V<br>Va에 연결된 선간전압 <b>Vab, Vca</b>가 63.5V로 저하됩니다.<br>Vbc = Vb-Vc는 영향 없이 110V 유지.<br>UVR(지락과전압계전기) 또는 PT 경보가 동작할 수 있습니다.`,
+    b: `<b>B상(v) 퓨즈 단선</b> — Vb = 0V<br>Vb에 연결된 선간전압 <b>Vab, Vbc</b>가 63.5V로 저하됩니다.<br>Vca = Vc-Va는 영향 없이 110V 유지.`,
+    c: `<b>C상(w) 퓨즈 단선</b> — Vc = 0V<br>Vc에 연결된 선간전압 <b>Vbc, Vca</b>가 63.5V로 저하됩니다.<br>Vab = Va-Vb는 영향 없이 110V 유지.`,
+  };
+  document.getElementById('exp-box').innerHTML = expMap[fault];
+  drawPhasor();
+}
+
+function setPhasorMode(mode) {
+  phasorMode = mode;
+  ['pmode-phase', 'pmode-line', 'pmode-both'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.className = 'fault-btn';
+    if (['phase', 'line', 'both'][i] === mode) el.classList.add('active-normal');
+  });
+  drawPhasor();
+}
+
+function drawPhasor() {
+  const v = getVectors(currentFault);
+  const CX = 170, CY = 150;
+  const SCALE_PH = 90 / Vph;
+  const SCALE_LN = 55 / 110;
+
+  function arrow(svg, fromX, fromY, toX, toY, color, dash, marker, label) {
+    const dx = toX - fromX, dy = toY - fromY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 2) return;
+    const ex = toX - (dx / d) * 5, ey = toY - (dy / d) * 5;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', fromX); line.setAttribute('y1', fromY);
+    line.setAttribute('x2', ex);    line.setAttribute('y2', ey);
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', dash ? '1.5' : '2.5');
+    if (dash) line.setAttribute('stroke-dasharray', '5,3');
+    line.setAttribute('marker-end', `url(#${marker})`);
+    line.setAttribute('opacity', d < 5 ? '0.15' : '1');
+    svg.appendChild(line);
+    if (label && d > 10) {
+      const tx = (fromX + toX) / 2 + (dy / d) * 14 + (toX > fromX ? -4 : 4);
+      const ty = (fromY + toY) / 2 - (dx / d) * 14;
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', tx); t.setAttribute('y', ty);
+      t.setAttribute('fill', color); t.setAttribute('font-size', '11');
+      t.setAttribute('font-family', 'JetBrains Mono,monospace');
+      t.setAttribute('font-weight', '600');
+      t.setAttribute('text-anchor', 'middle');
+      t.textContent = label;
+      svg.appendChild(t);
+    }
+  }
+
+  const gPhase = document.getElementById('phasors-phase');
+  const gLine  = document.getElementById('phasors-line');
+  const gGrid  = document.getElementById('grid');
+  [gPhase, gLine, gGrid].forEach(g => { while (g.firstChild) g.removeChild(g.firstChild); });
+
+  [30, 60, 90].forEach(r => {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', CX); c.setAttribute('cy', CY); c.setAttribute('r', r);
+    c.setAttribute('fill', 'none'); c.setAttribute('stroke', '#263044'); c.setAttribute('stroke-width', '1');
+    gGrid.appendChild(c);
+  });
+
+  const svgPt = (vec, scale) => ({ x: CX + vec.re * scale, y: CY - vec.im * scale });
+  const showPhase = phasorMode === 'phase' || phasorMode === 'both';
+  const showLine  = phasorMode === 'line'  || phasorMode === 'both';
+
+  if (showPhase) {
+    [
+      { vec: v.Va, color: '#f87171', marker: 'arr-A', label: 'Va' },
+      { vec: v.Vb, color: '#60a5fa', marker: 'arr-B', label: 'Vb' },
+      { vec: v.Vc, color: '#4ade80', marker: 'arr-C', label: 'Vc' },
+    ].forEach(p => {
+      const pt = svgPt(p.vec, SCALE_PH);
+      arrow(gPhase, CX, CY, pt.x, pt.y, p.color, false, p.marker, p.label);
+    });
+  }
+
+  if (showLine) {
+    const ptA = svgPt(v.Va, SCALE_PH);
+    const ptB = svgPt(v.Vb, SCALE_PH);
+    const ptC = svgPt(v.Vc, SCALE_PH);
+    if (phasorMode === 'both') {
+      arrow(gLine, ptA.x, ptA.y, ptB.x, ptB.y, '#fb923c', true, 'arr-AB', 'Vab');
+      arrow(gLine, ptB.x, ptB.y, ptC.x, ptC.y, '#a78bfa', true, 'arr-BC', 'Vbc');
+      arrow(gLine, ptC.x, ptC.y, ptA.x, ptA.y, '#34d399', true, 'arr-CA', 'Vca');
+    } else {
+      [
+        { vec: v.Vab, color: '#fb923c', marker: 'arr-AB', label: 'Vab' },
+        { vec: v.Vbc, color: '#a78bfa', marker: 'arr-BC', label: 'Vbc' },
+        { vec: v.Vca, color: '#34d399', marker: 'arr-CA', label: 'Vca' },
+      ].forEach(l => {
+        const pt = svgPt(l.vec, SCALE_LN);
+        arrow(gLine, CX, CY, pt.x, pt.y, l.color, true, l.marker, l.label);
+      });
+    }
+  }
+
+  const modeExp = {
+    phase: '상전압 벡터(Va, Vb, Vc)를 원점에서 표시합니다.',
+    line: '선간전압 벡터(Vab, Vbc, Vca)를 원점에서 표시합니다.',
+    both: '상전압(실선)을 그린 후, 끝점 간 차이(점선)가 선간전압입니다.<br><b>Vab = Va − Vb</b> (A끝 → B끝), <b>Vbc = Vb − Vc</b>, <b>Vca = Vc − Va</b>',
+  };
+  document.getElementById('phasor-exp').innerHTML = modeExp[phasorMode];
+}
+
+simulate('normal');
+setPhasorMode('line');
+</script>
+</body>
+</html>
